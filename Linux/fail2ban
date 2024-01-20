@@ -38,7 +38,7 @@ do
 		cat > /etc/fail2ban/jail.local <<- EOM
 			[sshd]
 			enabled = true
-			bantime = 60m
+			bantime = 3600
 			maxretry = 5
             ignoreip = $SUBNET
 		EOM

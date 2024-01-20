@@ -64,8 +64,9 @@ while true; do
 
     #AUTHORIZED_KEYS TO AUTHORIZED_KEYS.MD5.NOW
     ##might cause issues
-    #find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> now/authorized_keys.md5.now \; 2>/dev/null
-
+    rm -f now/authorized_keys.md5.now
+    find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> now/authorized_keys.md5.now \; 2>/dev/null
+ 
     #HOSTS TO HOSTS.NOW
     cp /etc/hosts now/hosts.now && cat /etc/hosts.allow /etc/hosts.deny >> now/hosts.now 2>/dev/null
 
@@ -118,13 +119,12 @@ while true; do
     fi
 
     #AUTHORIZED_KEYS LOOP
-    #if [[ "$(md5trim current/authorized_keys.md5.current)" != "$(md5trim now/authorized_keys.md5.now)" ]]; then
-    #    techo "[AUTHORIZED_KEYS MODIFIED]"
-    #    echo "OLD is LEFT -- NEW is RIGHT"
-    #    diff -y --suppress-common-lines current/authorized_keys.md5.current now/authorized_keys.md5.now
-    #    cp now/authorized_keys.md5.now current/authorized_keys.md5.current
-    #
-    #fi
+    if [[ "$(md5trim current/authorized_keys.md5.current)" != "$(md5trim now/authorized_keys.md5.now)" ]]; then
+        techo "[AUTHORIZED_KEYS MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines current/authorized_keys.md5.current now/authorized_keys.md5.now
+        cp now/authorized_keys.md5.now current/authorized_keys.md5.current
+    fi
 
     #AUTHORIZED_KEYS LOOP2
     #find / $FINDARGS -type f -name authorized_keys -exec if [ SUM=$(md5sum {}) != "$(grep -v -f current/authorized_keys.md5.current)" ]; then techo "[AUTHORIZED_KEYS MODIFIED]" && echo $SUM | tee -a current/authorized_keys.md5.current; fi \; 2>/dev/null
