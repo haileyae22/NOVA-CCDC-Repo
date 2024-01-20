@@ -13,10 +13,8 @@ if [ ! -f "$input" ]; then
     echo "$input file not found"
     exit 1
 fi
-#Ask for password input
-echo -n "Enter the password you would like to use: " && read -s PASSWORD
 
 #Change user passwords for standard users
-while IFS= read -r line; do
-    echo $PASSWORD | passwd --stdin $line
-done < "$input"
+for name in $(cat userlist.txt); do
+    echo -n "$name " && passwd $name
+done

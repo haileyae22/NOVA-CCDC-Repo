@@ -16,7 +16,6 @@ if [ ! -f "$input" ]; then
 fi
 
 #Disable unecessary users
-while IFS= read -r line; do
-    usermod -s /sbin/nologin $line
-    passwd -l $line
-done < "$input"
+for name in $(cat disable_users.txt); do
+    echo -n "Setting shell & locking for $name" && usermod -s /sbin/nologin $name && passwd -l $name
+done
