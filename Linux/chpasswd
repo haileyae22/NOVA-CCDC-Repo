@@ -1,11 +1,22 @@
 #!/bin/bash
+
+#Check root permissions
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root" 
+    exit 1
+fi
+
+#Check if files exist
 input="userlist.txt"
 
 if [ ! -f "$input" ]; then
     echo "$input file not found"
     exit 1
 fi
+#Ask for password input
+echo -n "Enter the password you would like to use: " && read -s PASSWORD
 
+#Change user passwords for standard users
 while IFS= read -r line; do
-    passwd $line
+    echo $PASSWORD | passwd --stdin $line
 done < "$input"
