@@ -1,0 +1,124 @@
+#!/bin/bash
+#File Checks
+
+#Check root permissions
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root" 
+    exit 1
+fi
+
+#Check if files exist
+if [[ ! -f passwd.orig || ! -f group.orig || ! -f sudoers.orig || ! -f services.orig || ! -f setxid.orig || ! -f sshd_config.orig || ! -f authorized_keys.md5.orig ]]; then
+    echo "One or more of the original files are missing"
+    exit 1
+fi
+
+#STARTUP
+cp passwd.orig passwd.current
+cp group.orig group.current
+cp sudoers.orig sudoers.current
+cp services.orig services.current
+cp setxid.orig setxid.current
+cp sshd_config.orig sshd_config.current
+cp authorized_keys.md5.orig authorized_keys.md5.current
+FINDARGS="\( -path /sys -o -path /mnt -o -path /dev -o -path /proc \) -prune"
+LOGFILE="file_changes_$(date +%Y%m%d_%H%M%S).log"
+
+#FUNCTION FOR MD5SUM ONLY
+function md5trim() {
+    md5sum $1 | awk '{ print $1 }'
+}
+
+#FUNCTION PREPENDS TIMESTAMP
+function techo() {
+    echo $1 | awk '{ printf("%s %s\n", strftime("%c", systime()), $0) }'
+}
+
+#FUNCTION HANDLES SIGINT
+function handle_sigint() {
+    techo "[SCRIPT INTERRUPTED]" | tee -a "$LOGFILE"
+    exit 1
+}
+
+trap handle_sigint SIGINT
+
+#MAIN LOOP
+while true; do
+    #SETXID BINARY CHECK TO SETXID.NOW
+    find / $FINDARGS -type f -perm /6000 > setxid.now 2>/dev/null 
+
+    #SERVICE LIST CHECK TO SERVICES.NOW
+    systemctl list-unit-files --type=service --state=enabled --no-pager > services.now
+    
+    #SUDOERS.D TO SUDOERS.NOW
+    cp /etc/sudoers sudoers.now && cat /etc/sudoers.d/* >> sudoers.now
+
+    #SSHD_CONFIG.D TO SSHD_CONFIG.NOW
+    cp /etc/ssh/sshd_config sshd_config.now && cat /etc/ssh/sshd_config.d/* >> sshd_config.now
+
+    #AUTHORIZED_KEYS TO AUTHORIZED_KEYS.MD5.NOW
+    ##might cause issues
+    find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> authorized_keys.md5.now \; 2>/dev/null
+
+    #PASSWD LOOP
+    if [[ "$(md5trim passwd.current)" != "$(md5trim /etc/passwd)" ]]; then
+        techo "[PASSWD MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines passwd.current /etc/passwd
+        cp /etc/passwd passwd.current
+    fi
+
+    #GROUP LOOP
+    if [[ "$(md5trim group.current)" != "$(md5trim /etc/group)" ]]; then
+        techo "[GROUP MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines group.current /etc/group
+        cp /etc/group group.current
+    fi
+
+    #SUDOERS LOOP
+    if [[ "$(md5trim sudoers.current)" != "$(md5trim sudoers.now)" ]]; then
+        techo "[SUDOERS MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines sudoers.current sudoers.now
+        cp sudoers.now sudoers.current
+    fi
+
+    #SERVICES LOOP
+    if [[ "$(md5trim services.current)" != "$(md5trim services.now)" ]]; then
+        techo "[SERVICES MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines services.current services.now
+        cp services.now services.current
+    fi
+
+    #SETXID LOOP
+    if [[ "$(md5trim setxid.current)" != "$(md5trim setxid.now)" ]]; then
+        techo "[SETXID BINARIES MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines setxid.current setxid.now
+        cp setxid.now setxid.current
+    fi
+
+    #SSHD_CONFIG LOOP
+    if [[ "$(md5trim sshd_config.current)" != "$(md5trim /etc/ssh/sshd_config)" ]]; then
+        techo "[SSHD_CONFIG MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines sshd_config.current /etc/ssh/sshd_config
+        cp /etc/ssh/sshd_config sshd_config.current
+    fi
+
+    #AUTHORIZED_KEYS LOOP
+    if [[ "$(md5trim authorized_keys.md5.current)" != "$(md5trim authorized_keys.md5.now)" ]]; then
+        techo "[AUTHORIZED_KEYS MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines authorized_keys.md5.current authorized_keys.md5.now
+        cp authorized_keys.md5.now authorized_keys.md5.current
+
+    fi
+    #WAIT 2 SECONDS
+    sleep 2
+
+    #LOG OUTPUT
+
+done | tee -a "$LOGFILE"

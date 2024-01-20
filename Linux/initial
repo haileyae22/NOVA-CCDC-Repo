@@ -1,0 +1,53 @@
+#!/bin/bash
+# Initial Linux Script
+FINDARGS="\( -path /sys -o -path /mnt -o -path /dev -o -path /proc \) -prune"
+# Disables the ability to load new modules
+sudo sysctl -w kernel.modules_disabled=1
+sudo echo 'kernel.modules_disabled=1' > /etc/sysctl.conf
+
+# Edit sshd_config
+sudo sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/g' /etc/ssh/sshd_config
+#Enable public key authentication
+sudo systemctl restart sshd
+
+# Check for NOPASSWD in sudoers
+NOPASSWD_CHECK= $(sudo grep -n NOPASSWD /etc/sudoers)
+if [ "$NOPASSWD_CHECK" != "" ]; then
+    sudo visudo
+fi
+
+# Create and copy original files
+#PASSWD
+cp /etc/passwd passwd.orig
+
+#GROUP
+cp /etc/group group.orig
+
+#SUDOERS
+sudo cp /etc/sudoers sudoers.orig && sudo chown $UID:$UID sudoers.orig
+sudo cat /etc/sudoers.d/* >> sudoers.orig
+
+#SSHD_CONFIG
+cp /etc/ssh/sshd_config sshd_config.orig
+cat /etc/ssh/sshd_config/* >> sshd_config.orig
+
+#AUTHORIZED_KEYS
+sudo find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> authorized_keys.md5.orig \; 2>/dev/null
+
+#SETXID
+sudo find / $FINDARGS -type f -perm /6000 > setxid.orig 2>/dev/null
+
+#SERVICES
+sudo systemctl list-unit-files --type=service --state=enabled --no-pager > services.orig 2>/dev/null
+
+#BACKUP ALL ORIGINAL FILES
+sudo tar -cvf backup.tar *.orig
+
+#LOCK ALL ORIGINAL FILES
+sudo chattr +i *.orig
+
+# Lock root account and change administrator password
+sudo passwd -l root
+passwd $(whoami)
+
+
