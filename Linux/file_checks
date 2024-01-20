@@ -50,7 +50,7 @@ while true; do
     #SETXID BINARY CHECK TO SETXID.NOW
     find / $FINDARGS -type f -perm /6000 -print > now/setxid.now 2>/dev/null 
 
-    #SERVICE LIST CHECK TO SERVICES.NOW
+    #SERVICE ENABLED LIST CHECK TO SERVICES.NOW
     systemctl list-unit-files --type=service --state=enabled --no-pager > now/services.now 2>/dev/null
     
     #TIMERS LIST CHECK TO TIMERS.NOW
@@ -152,4 +152,4 @@ while true; do
 
     #LOG OUTPUT
 
-done | tee -a "$LOGFILE"
+done >> "$LOGFILE" 2>&1

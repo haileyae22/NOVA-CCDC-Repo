@@ -52,7 +52,7 @@ find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> authorized_key
 #SETXID
 find / $FINDARGS -type f -perm /6000 -print > setxid.orig 2>/dev/null
 
-#SERVICES
+#SERVICES ENABLED
 systemctl list-unit-files --type=service --state=enabled --no-pager > services.orig 2>/dev/null
 
 #SYSTEMD TIMERS
@@ -60,7 +60,7 @@ systemctl list-unit-files --type=timer --state=enabled --no-pager > timers.orig 
 
 #TODO: CRONTAB
 
-#TODO: HOSTS.ALLOW/DENY
+#HOSTS.ALLOW/DENY
 cp /etc/hosts hosts.orig && cat /etc/hosts.allow /etc/hosts.deny >> hosts.orig 2>/dev/null
 
 #TODO: ADD ADDITIONAL CONFIGS
