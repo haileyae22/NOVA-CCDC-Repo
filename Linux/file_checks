@@ -126,11 +126,6 @@ while true; do
         cp now/authorized_keys.md5.now current/authorized_keys.md5.current
     fi
 
-    #AUTHORIZED_KEYS LOOP2
-    #find / $FINDARGS -type f -name authorized_keys -exec if [ SUM=$(md5sum {}) != "$(grep -v -f current/authorized_keys.md5.current)" ]; then techo "[AUTHORIZED_KEYS MODIFIED]" && echo $SUM | tee -a current/authorized_keys.md5.current; fi \; 2>/dev/null
-    #BROKEN
-    #find / $FINDARGS -type f -name authorized_keys -exec bash -c 'if ! grep -q $(md5sum "{}" | cut -d" " -f1) current/authorized_keys.md5.current; then techo "[AUTHORIZED_KEYS MODIFIED]" && md5sum "{}" | tee -a current/authorized_keys.md5.current; fi' \; 2>/dev/null
-    
     #TIMERS LOOP
     if [[ "$(md5trim current/timers.current)" != "$(md5trim now/timers.now)" ]]; then
         techo "[TIMERS MODIFIED]"

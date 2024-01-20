@@ -1,0 +1,22 @@
+#!/bin/bash
+#Disable unecessary users
+
+#Check root permissions
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root" 
+    exit 1
+fi
+
+#Check if files exist
+input="disable_users.txt"
+
+if [ ! -f "$input" ]; then
+    echo "$input file not found"
+    exit 1
+fi
+
+#Disable unecessary users
+while IFS= read -r line; do
+    usermod -s /sbin/nologin $line
+    passwd -l $line
+done < "$input"
