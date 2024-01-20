@@ -8,8 +8,8 @@ if [ $(whoami) != "root" ]; then
     exit 1
 fi
 
-if [ $SUBNET == "" ]; then
-    echo -n "Enter the subnet you want to allow SSH access from (ex. x.x.x.x/x): " && read SUBNET
+if [[ "$SUBNET" == "" ]]; then
+    echo -n "Enter the subnet(s) you want to whitelist access from delimited by spaces (ex. x.x.x.x/x): " && read SUBNET
 fi
 
 # Formatted output
@@ -36,12 +36,12 @@ do
         
         becho "Creating fail2ban config"
 		cat > /etc/fail2ban/jail.local <<- EOM
-			[sshd]
-			enabled = true
-			bantime = 3600
-			maxretry = 5
-            ignoreip = $SUBNET
-		EOM
+[sshd]
+enabled = true
+bantime = 3600
+maxretry = 5
+ignoreip = $SUBNET
+EOM
         
         becho "Enabling fail2ban service"
         if [[ "$f" == "/etc/alpine-release" ]]; then
