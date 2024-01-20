@@ -1,9 +1,16 @@
 #!/bin/bash
 # Initial Linux Script
-FINDARGS="\( -path /sys -o -path /mnt -o -path /dev -o -path /proc \) -prune"
+
+#Check root permissions
+if [[ $EUID -ne 0 ]]; then
+    echo "This script must be run as root" 
+    exit 1
+fi
+
+FINDARGS="( -path /proc -o -path /sys -o -path /dev -o -path /mnt ) -prune -o"
 # Disables the ability to load new modules
-sudo sysctl -w kernel.modules_disabled=1
-sudo echo 'kernel.modules_disabled=1' > /etc/sysctl.conf
+sysctl -w kernel.modules_disabled=1
+echo 'kernel.modules_disabled=1' > /etc/sysctl.conf
 
 # Edit sshd_config
 sudo sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/g' /etc/ssh/sshd_config
@@ -11,12 +18,20 @@ sudo sed -i 's/PermitRootLogin yes/PermitRootLogin prohibit-password/g' /etc/ssh
 sudo systemctl restart sshd
 
 # Check for NOPASSWD in sudoers
-NOPASSWD_CHECK= $(sudo grep -n NOPASSWD /etc/sudoers)
+NOPASSWD_CHECK="$(grep -n NOPASSWD /etc/sudoers)"
 if [ "$NOPASSWD_CHECK" != "" ]; then
-    sudo visudo
+    read -n1 -r -p "NOPASSWD found in sudoers. Press any key to edit sudoers..."
+    visudo
 fi
 
-# Create and copy original files
+#CREATE/COPY ORIGINAL FILES
+
+#CREATE FOLDER STRUCTURE
+mkdir -p orig
+mkdir -p logs
+mkdir -p current
+mkdir -p now
+
 #PASSWD
 cp /etc/passwd passwd.orig
 
@@ -24,30 +39,41 @@ cp /etc/passwd passwd.orig
 cp /etc/group group.orig
 
 #SUDOERS
-sudo cp /etc/sudoers sudoers.orig && sudo chown $UID:$UID sudoers.orig
-sudo cat /etc/sudoers.d/* >> sudoers.orig
+cp /etc/sudoers sudoers.orig && sudo chown $UID:$UID sudoers.orig
+cat /etc/sudoers.d/* >> sudoers.orig
 
 #SSHD_CONFIG
 cp /etc/ssh/sshd_config sshd_config.orig
-cat /etc/ssh/sshd_config/* >> sshd_config.orig
+cat /etc/ssh/sshd_config.d/* >> sshd_config.orig 2>/dev/null
 
 #AUTHORIZED_KEYS
-sudo find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> authorized_keys.md5.orig \; 2>/dev/null
+find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> authorized_keys.md5.orig \; 2>/dev/null
 
 #SETXID
-sudo find / $FINDARGS -type f -perm /6000 > setxid.orig 2>/dev/null
+find / $FINDARGS -type f -perm /6000 -print > setxid.orig 2>/dev/null
 
 #SERVICES
-sudo systemctl list-unit-files --type=service --state=enabled --no-pager > services.orig 2>/dev/null
+systemctl list-unit-files --type=service --state=enabled --no-pager > services.orig 2>/dev/null
 
+#SYSTEMD TIMERS
+systemctl list-unit-files --type=timer --state=enabled --no-pager > timers.orig 2>/dev/null
+
+#TODO: CRONTAB
+
+#TODO: HOSTS.ALLOW/DENY
+
+#TODO: ADD ADDITIONAL CONFIGS
+
+
+#MOVE ALL ORIGINAL FILES TO ORIG FOLDER
+mv *.orig orig
 #BACKUP ALL ORIGINAL FILES
-sudo tar -cvf backup.tar *.orig
+tar -cvf backup.tar orig/*.orig
 
 #LOCK ALL ORIGINAL FILES
-sudo chattr +i *.orig
+chattr +i orig/*.orig
 
 # Lock root account and change administrator password
-sudo passwd -l root
-passwd $(whoami)
+passwd -l root
 
 

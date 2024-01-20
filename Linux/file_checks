@@ -8,21 +8,23 @@ if [[ $EUID -ne 0 ]]; then
 fi
 
 #Check if files exist
-if [[ ! -f passwd.orig || ! -f group.orig || ! -f sudoers.orig || ! -f services.orig || ! -f setxid.orig || ! -f sshd_config.orig || ! -f authorized_keys.md5.orig ]]; then
-    echo "One or more of the original files are missing"
+if [[ ! -d orig ]]; then
+    echo "orig directory does not exist"
     exit 1
 fi
 
 #STARTUP
-cp passwd.orig passwd.current
-cp group.orig group.current
-cp sudoers.orig sudoers.current
-cp services.orig services.current
-cp setxid.orig setxid.current
-cp sshd_config.orig sshd_config.current
-cp authorized_keys.md5.orig authorized_keys.md5.current
-FINDARGS="\( -path /sys -o -path /mnt -o -path /dev -o -path /proc \) -prune"
-LOGFILE="file_changes_$(date +%Y%m%d_%H%M%S).log"
+cp orig/passwd.orig current/passwd.current
+cp orig/group.orig current/group.current
+cp orig/sudoers.orig current/sudoers.current
+cp orig/services.orig current/services.current
+cp orig/setxid.orig current/setxid.current
+cp orig/sshd_config.orig current/sshd_config.current
+cp orig/authorized_keys.md5.orig current/authorized_keys.md5.current
+cp orig/timers.orig current/timers.current
+
+FINDARGS="( -path /proc -o -path /sys -o -path /dev -o -path /mnt ) -prune -o"
+LOGFILE="logs/file_changes_$(date +%Y%m%d_%H%M%S).log"
 
 #FUNCTION FOR MD5SUM ONLY
 function md5trim() {
@@ -45,79 +47,103 @@ trap handle_sigint SIGINT
 #MAIN LOOP
 while true; do
     #SETXID BINARY CHECK TO SETXID.NOW
-    find / $FINDARGS -type f -perm /6000 > setxid.now 2>/dev/null 
+    find / $FINDARGS -type f -perm /6000 -print > now/setxid.now 2>/dev/null 
 
     #SERVICE LIST CHECK TO SERVICES.NOW
-    systemctl list-unit-files --type=service --state=enabled --no-pager > services.now
+    systemctl list-unit-files --type=service --state=enabled --no-pager > now/services.now 2>/dev/null
     
+    #TIMERS LIST CHECK TO TIMERS.NOW
+    systemctl list-unit-files --type=timer --state=enabled --no-pager > now/timers.now 2>/dev/null
+
     #SUDOERS.D TO SUDOERS.NOW
-    cp /etc/sudoers sudoers.now && cat /etc/sudoers.d/* >> sudoers.now
+    cp /etc/sudoers now/sudoers.now && cat /etc/sudoers.d/* >> now/sudoers.now 2>/dev/null
 
     #SSHD_CONFIG.D TO SSHD_CONFIG.NOW
-    cp /etc/ssh/sshd_config sshd_config.now && cat /etc/ssh/sshd_config.d/* >> sshd_config.now
+    cp /etc/ssh/sshd_config now/sshd_config.now && cat /etc/ssh/sshd_config.d/* >> now/sshd_config.now 2>/dev/null
 
     #AUTHORIZED_KEYS TO AUTHORIZED_KEYS.MD5.NOW
     ##might cause issues
-    find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> authorized_keys.md5.now \; 2>/dev/null
-
+    #find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> now/authorized_keys.md5.now \; 2>/dev/null
+    
     #PASSWD LOOP
-    if [[ "$(md5trim passwd.current)" != "$(md5trim /etc/passwd)" ]]; then
+    if [[ "$(md5trim current/passwd.current)" != "$(md5trim /etc/passwd)" ]]; then
         techo "[PASSWD MODIFIED]"
         echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines passwd.current /etc/passwd
-        cp /etc/passwd passwd.current
+        diff -y --suppress-common-lines current/passwd.current /etc/passwd
+        cp /etc/passwd current/passwd.current
     fi
 
     #GROUP LOOP
-    if [[ "$(md5trim group.current)" != "$(md5trim /etc/group)" ]]; then
+    if [[ "$(md5trim current/group.current)" != "$(md5trim /etc/group)" ]]; then
         techo "[GROUP MODIFIED]"
         echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines group.current /etc/group
-        cp /etc/group group.current
+        diff -y --suppress-common-lines current/group.current /etc/group
+        cp /etc/group current/group.current
     fi
 
     #SUDOERS LOOP
-    if [[ "$(md5trim sudoers.current)" != "$(md5trim sudoers.now)" ]]; then
+    if [[ "$(md5trim current/sudoers.current)" != "$(md5trim now/sudoers.now)" ]]; then
         techo "[SUDOERS MODIFIED]"
         echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines sudoers.current sudoers.now
-        cp sudoers.now sudoers.current
+        diff -y --suppress-common-lines current/sudoers.current now/sudoers.now
+        cp now/sudoers.now current/sudoers.current
     fi
 
     #SERVICES LOOP
-    if [[ "$(md5trim services.current)" != "$(md5trim services.now)" ]]; then
+    if [[ "$(md5trim current/services.current)" != "$(md5trim now/services.now)" ]]; then
         techo "[SERVICES MODIFIED]"
         echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines services.current services.now
-        cp services.now services.current
+        diff -y --suppress-common-lines current/services.current now/services.now
+        cp now/services.now current/services.current
     fi
 
     #SETXID LOOP
-    if [[ "$(md5trim setxid.current)" != "$(md5trim setxid.now)" ]]; then
+    if [[ "$(md5trim current/setxid.current)" != "$(md5trim now/setxid.now)" ]]; then
         techo "[SETXID BINARIES MODIFIED]"
         echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines setxid.current setxid.now
-        cp setxid.now setxid.current
+        diff -y --suppress-common-lines current/setxid.current now/setxid.now
+        cp now/setxid.now current/setxid.current
     fi
 
     #SSHD_CONFIG LOOP
-    if [[ "$(md5trim sshd_config.current)" != "$(md5trim /etc/ssh/sshd_config)" ]]; then
+    if [[ "$(md5trim current/sshd_config.current)" != "$(md5trim now/sshd_config.now)" ]]; then
         techo "[SSHD_CONFIG MODIFIED]"
         echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines sshd_config.current /etc/ssh/sshd_config
-        cp /etc/ssh/sshd_config sshd_config.current
+        diff -y --suppress-common-lines current/sshd_config.current now/sshd_config.now
+        cp now/sshd_config.now current/sshd_config.current
     fi
 
     #AUTHORIZED_KEYS LOOP
-    if [[ "$(md5trim authorized_keys.md5.current)" != "$(md5trim authorized_keys.md5.now)" ]]; then
-        techo "[AUTHORIZED_KEYS MODIFIED]"
-        echo "OLD is LEFT -- NEW is RIGHT"
-        diff -y --suppress-common-lines authorized_keys.md5.current authorized_keys.md5.now
-        cp authorized_keys.md5.now authorized_keys.md5.current
+    #if [[ "$(md5trim current/authorized_keys.md5.current)" != "$(md5trim now/authorized_keys.md5.now)" ]]; then
+    #    techo "[AUTHORIZED_KEYS MODIFIED]"
+    #    echo "OLD is LEFT -- NEW is RIGHT"
+    #    diff -y --suppress-common-lines current/authorized_keys.md5.current now/authorized_keys.md5.now
+    #    cp now/authorized_keys.md5.now current/authorized_keys.md5.current
+    #
+    #fi
 
+    #AUTHORIZED_KEYS LOOP2
+    #find / $FINDARGS -type f -name authorized_keys -exec if [ SUM=$(md5sum {}) != "$(grep -v -f current/authorized_keys.md5.current)" ]; then techo "[AUTHORIZED_KEYS MODIFIED]" && echo $SUM | tee -a current/authorized_keys.md5.current; fi \; 2>/dev/null
+    #BROKEN
+    #find / $FINDARGS -type f -name authorized_keys -exec bash -c 'if ! grep -q $(md5sum "{}" | cut -d" " -f1) current/authorized_keys.md5.current; then techo "[AUTHORIZED_KEYS MODIFIED]" && md5sum "{}" | tee -a current/authorized_keys.md5.current; fi' \; 2>/dev/null
+    
+    #TIMERS LOOP
+    if [[ "$(md5trim current/timers.current)" != "$(md5trim now/timers.now)" ]]; then
+        techo "[TIMERS MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines current/timers.current now/timers.now
+        cp now/timers.now current/timers.current
     fi
-    #WAIT 2 SECONDS
-    sleep 2
+
+    #TODO: CRONTAB
+    
+    #TODO: HOSTS.ALLOW/DENY
+
+    #TODO: ADD ADDITIONAL CONFIGS
+    
+    
+    #WAIT 1 SECONDS
+    sleep 1
 
     #LOG OUTPUT
 
