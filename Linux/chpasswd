@@ -1,0 +1,11 @@
+#!/bin/bash
+input="userlist.txt"
+
+if [ ! -f "$input" ]; then
+    echo "$input file not found"
+    exit 1
+fi
+
+while IFS= read -r line; do
+    passwd $line
+done < "$input"

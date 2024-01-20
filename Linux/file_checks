@@ -22,6 +22,7 @@ cp orig/setxid.orig current/setxid.current
 cp orig/sshd_config.orig current/sshd_config.current
 cp orig/authorized_keys.md5.orig current/authorized_keys.md5.current
 cp orig/timers.orig current/timers.current
+cp orig/hosts.orig current/hosts.current
 
 FINDARGS="( -path /proc -o -path /sys -o -path /dev -o -path /mnt ) -prune -o"
 LOGFILE="logs/file_changes_$(date +%Y%m%d_%H%M%S).log"
@@ -64,7 +65,10 @@ while true; do
     #AUTHORIZED_KEYS TO AUTHORIZED_KEYS.MD5.NOW
     ##might cause issues
     #find / $FINDARGS -type f -name authorized_keys -exec md5sum {} >> now/authorized_keys.md5.now \; 2>/dev/null
-    
+
+    #HOSTS TO HOSTS.NOW
+    cp /etc/hosts now/hosts.now && cat /etc/hosts.allow /etc/hosts.deny >> now/hosts.now 2>/dev/null
+
     #PASSWD LOOP
     if [[ "$(md5trim current/passwd.current)" != "$(md5trim /etc/passwd)" ]]; then
         techo "[PASSWD MODIFIED]"
@@ -137,7 +141,13 @@ while true; do
 
     #TODO: CRONTAB
     
-    #TODO: HOSTS.ALLOW/DENY
+    #HOSTS LOOP
+    if [[ "$(md5trim current/hosts.current)" != "$(md5trim now/hosts.now)" ]]; then
+        techo "[HOSTS MODIFIED]"
+        echo "OLD is LEFT -- NEW is RIGHT"
+        diff -y --suppress-common-lines current/hosts.current now/hosts.now
+        cp now/hosts.now current/hosts.current
+    fi
 
     #TODO: ADD ADDITIONAL CONFIGS
     

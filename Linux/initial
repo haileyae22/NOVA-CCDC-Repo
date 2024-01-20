@@ -61,8 +61,10 @@ systemctl list-unit-files --type=timer --state=enabled --no-pager > timers.orig 
 #TODO: CRONTAB
 
 #TODO: HOSTS.ALLOW/DENY
+cp /etc/hosts hosts.orig && cat /etc/hosts.allow /etc/hosts.deny >> hosts.orig 2>/dev/null
 
 #TODO: ADD ADDITIONAL CONFIGS
+
 
 
 #MOVE ALL ORIGINAL FILES TO ORIG FOLDER
